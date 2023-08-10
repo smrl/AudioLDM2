@@ -137,7 +137,7 @@ for text in prompt_todo:
     save_wave(waveform, save_path, name=name)
 
     # add metadata tags
-    
+
     tagger = AudioTagger(save_path)
     tagger.add_tag("ORIGINATOR", "Team Audio")
     tagger.add_tag("PROCEDURE", "AudioLDM2 Text-to-Audio")
@@ -150,6 +150,8 @@ for text in prompt_todo:
     results.append([save_path, text])
     
 # CLAP scoring
+
+print ("Scoring audio with CLAP")
 
 clap = CLAPAudioEmbeddingClassifierFreev2(
             pretrained_path="",
@@ -167,3 +169,5 @@ for text in prompt_todo:
             score = clap.cos_similarity(waveform, result_text) # calculate the score
             tagger = AudioTagger(result_path) # result[0] is the path to the generated audio
             tagger.add_tag("SCORE", score) # add the score to the audio
+            print("Score for %s is %s" % (result_path, score))
+            
