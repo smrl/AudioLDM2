@@ -17,7 +17,6 @@ def text2audio(
     guidance_scale,
     random_seed,
     n_candidates,
-    duration,
     model_name=default_checkpoint,
 ):
     global audioldm, current_model_name
@@ -33,7 +32,7 @@ def text2audio(
         latent_diffusion=audioldm,
         text=text,
         seed=random_seed,
-        duration=duration,
+        duration=10,
         guidance_scale=guidance_scale,
         n_candidate_gen_per_text=int(n_candidates),
     )  # [bs, 1, samples]
@@ -229,9 +228,9 @@ with iface:
                     value=45,
                     label="Change this value (any integer number) will lead to a different generation result.",
                 )
-                duration = gr.Slider(
-                    0, 30, value=10, step=2.5, label="Duration (seconds)"
-                )
+                # duration = gr.Slider(
+                #     10, 10, value=10, step=2.5, label="Duration (seconds)"
+                # )
                 guidance_scale = gr.Slider(
                     0,
                     6,
@@ -328,7 +327,7 @@ with iface:
             ],
             fn=text2audio,
             # inputs=[textbox, duration, guidance_scale, seed, n_candidates, model_name],
-            inputs=[textbox, guidance_scale, seed, n_candidates, duration],
+            inputs=[textbox, guidance_scale, seed, n_candidates],
             outputs=[outputs],
             cache_examples=True,
         )
@@ -354,5 +353,5 @@ with iface:
 # <p>This demo is strictly for research demo purpose only. For commercial use please <a href="haoheliu@gmail.com">contact us</a>.</p>
 
 iface.queue(concurrency_count=3)
-iface.launch(debug=True)
+iface.launch(debug=True, share=True, auth=("teamaudio","teamaudio"))
 # iface.launch(debug=True, share=True)
