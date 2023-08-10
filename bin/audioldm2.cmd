@@ -1,2 +1,2 @@
 @echo OFF
-python -m audioldm2 %*
+python -m audioldm2_tag %*
