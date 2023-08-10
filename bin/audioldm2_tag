@@ -133,21 +133,21 @@ for text in prompt_todo:
         n_candidate_gen_per_text=n_candidate_gen_per_text,
         batchsize=args.batchsize,
     )
-    
-    save_wave(waveform, save_path, name=name)
+    print("saving...")
+    files = save_wave(waveform, save_path, name=name)
 
     # add metadata tags
+    for file in files:
+        tagger = AudioTagger(file)
+        tagger.add_tag("ORIGINATOR", "Team Audio")
+        tagger.add_tag("PROCEDURE", "AudioLDM2 Text-to-Audio")
+        tagger.add_tag("PROMPT", text)
+        tagger.add_tag("SEED", random_seed)
+        tagger.add_tag("STEPS", args.ddim_steps)
+        tagger.add_tag("SAMPLER", "DDIM")
+        tagger.add_tag("GUIDANCE", guidance_scale)
 
-    tagger = AudioTagger(save_path)
-    tagger.add_tag("ORIGINATOR", "Team Audio")
-    tagger.add_tag("PROCEDURE", "AudioLDM2 Text-to-Audio")
-    tagger.add_tag("PROMPT", text)
-    tagger.add_tag("SEED", random_seed)
-    tagger.add_tag("STEPS", args.ddim_steps)
-    tagger.add_tag("SAMPLER", "DDIM")
-    tagger.add_tag("GUIDANCE", guidance_scale)
-    
-    results.append([save_path, text])
+        results.append([file, text])
     
 # CLAP scoring
 
@@ -162,12 +162,10 @@ clap = CLAPAudioEmbeddingClassifierFreev2(
 
 for text in prompt_todo:
     for result in results:
-        result_text = result[1]
-        result_path = result[0]
+        result_path, result_text = result
         if result_text == text:  # if the prompt matches
             waveform = sf.read(result_path)[0] # read the audio in
             score = clap.cos_similarity(waveform, result_text) # calculate the score
             tagger = AudioTagger(result_path) # result[0] is the path to the generated audio
             tagger.add_tag("SCORE", score) # add the score to the audio
             print("Score for %s is %s" % (result_path, score))
-            

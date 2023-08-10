@@ -70,6 +70,7 @@ def save_wave(waveform, savepath, name="outwav"):
         )
         print("Save audio to %s" % path)
         sf.write(path, waveform[i, 0], samplerate=16000)
+        return path
 
 
 def exists(x):
