@@ -7,7 +7,7 @@ import argparse
 from audiotagger import AudioTagger
 from audioldm2.latent_diffusion.modules.encoders.modules import *
 import soundfile as sf
-
+import torch
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 matplotlib_logger = logging.getLogger('matplotlib')
@@ -164,7 +164,8 @@ for text in prompt_todo:
     for result in results:
         result_path, result_text = result
         if result_text == text:  # if the prompt matches
-            waveform = sf.read(result_path)[0] # read the audio in
+            waveform_np = sf.read(result_path)[0]
+            waveform = torch.tensor(waveform_np).float().cuda()
             score = clap.cos_similarity(waveform, result_text) # calculate the score
             tagger = AudioTagger(result_path) # result[0] is the path to the generated audio
             tagger.add_tag("SCORE", score) # add the score to the audio
