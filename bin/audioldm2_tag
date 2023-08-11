@@ -123,7 +123,7 @@ for text in prompt_todo:
     else:
         name = text[:128]
 
-    waveform = text_to_audio(
+    waveform, scores = text_to_audio(
         audioldm2,
         text,
         seed=random_seed,
@@ -137,8 +137,8 @@ for text in prompt_todo:
     files = save_wave(waveform, save_path, name=name)
 
     # add metadata tags
-    for file in files:
-        tagger = AudioTagger(file)
+    for i in enumerate(files):
+        tagger = AudioTagger(files[i])
         tagger.add_tag("ORIGINATOR", "Team Audio")
         tagger.add_tag("PROCEDURE", "AudioLDM2 Text-to-Audio")
         tagger.add_tag("PROMPT", text)
@@ -146,30 +146,31 @@ for text in prompt_todo:
         tagger.add_tag("STEPS", args.ddim_steps)
         tagger.add_tag("SAMPLER", "DDIM")
         tagger.add_tag("GUIDANCE", guidance_scale)
+        tagger.add_tag("SCORE", scores[i])
         tagger.write_tags()
 
         results.append([file, text])
     
 # CLAP scoring
 
-print ("Scoring audio with CLAP")
-
-clap = CLAPAudioEmbeddingClassifierFreev2(
-            pretrained_path="",
-            sampling_rate=16000,
-            embed_mode="audio",
-            amodel="HTSAT-base",
-        ).cuda()
-
-for text in prompt_todo:
-    for result in results:
-        result_path, result_text = result
-        if result_text == text:  # if the prompt matches
-            waveform_np = sf.read(result_path)[0]
-            waveform = torch.tensor(waveform_np).unsqueeze(0).float().cuda() # move to GPU
-            score = clap.cos_similarity(waveform, result_text) # calculate the score
-            score_float = score.cpu().item() # retrieve float from GPU
-            tagger = AudioTagger(result_path) # result[0] is the path to the generated audio
-            tagger.add_tag("SCORE", score_float) # add the score to the audio
-            tagger.write_tags() # write the tags to the audio
-            print("Score for %s is %s" % (result_path, score))
+#print ("Scoring audio with CLAP")
+#
+#clap = CLAPAudioEmbeddingClassifierFreev2(
+#            pretrained_path="",
+#            sampling_rate=16000,
+#            embed_mode="audio",
+#            amodel="HTSAT-base",
+#        ).cuda()
+#
+#for text in prompt_todo:
+#    for result in results:
+#        result_path, result_text = result
+#        if result_text == text:  # if the prompt matches
+#            waveform_np = sf.read(result_path)[0]
+#            waveform = torch.tensor(waveform_np).unsqueeze(0).float().cuda() # move to GPU
+#            score = clap.cos_similarity(waveform, result_text) # calculate the score
+#            score_float = score.cpu().item() # retrieve float from GPU
+#            tagger = AudioTagger(result_path) # result[0] is the path to the generated audio
+#            tagger.add_tag("SCORE", score_float) # add the score to the audio
+#            tagger.write_tags() # write the tags to the audio
+#            print("Score for %s is %s" % (result_path, score))
