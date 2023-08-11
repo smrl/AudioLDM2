@@ -166,7 +166,7 @@ for text in prompt_todo:
         if result_text == text:  # if the prompt matches
             waveform_np = sf.read(result_path)[0]
             waveform = torch.tensor(waveform_np).unsqueeze(0).float().cuda()
-                score = clap.cos_similarity(waveform, result_text) # calculate the score
+            score = clap.cos_similarity(waveform, result_text) # calculate the score
             tagger = AudioTagger(result_path) # result[0] is the path to the generated audio
             tagger.add_tag("SCORE", score) # add the score to the audio
             print("Score for %s is %s" % (result_path, score))
