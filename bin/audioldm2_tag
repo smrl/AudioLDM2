@@ -146,6 +146,7 @@ for text in prompt_todo:
         tagger.add_tag("STEPS", args.ddim_steps)
         tagger.add_tag("SAMPLER", "DDIM")
         tagger.add_tag("GUIDANCE", guidance_scale)
+        tagger.write_tags()
 
         results.append([file, text])
     
@@ -169,4 +170,5 @@ for text in prompt_todo:
             score = clap.cos_similarity(waveform, result_text) # calculate the score
             tagger = AudioTagger(result_path) # result[0] is the path to the generated audio
             tagger.add_tag("SCORE", score) # add the score to the audio
+            tagger.write_tags() # write the tags to the audio
             print("Score for %s is %s" % (result_path, score))
