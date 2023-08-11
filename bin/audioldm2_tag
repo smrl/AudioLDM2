@@ -8,7 +8,7 @@ from audiotagger import AudioTagger
 from audioldm2.latent_diffusion.modules.encoders.modules import *
 import soundfile as sf
 import torch
-print(f"AudioLDM2 Library: "{audioldm2.__file__})
+print(f"AudioLDM2 Library: {audioldm2.__file__}")
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 matplotlib_logger = logging.getLogger('matplotlib')
