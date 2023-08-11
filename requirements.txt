@@ -4,3 +4,4 @@ git+https://github.com/huggingface/transformers.git
 torch >= 2.0
 huggingface_hub
 transformers==4.30.2
+pytaglib
