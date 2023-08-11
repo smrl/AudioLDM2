@@ -155,5 +155,5 @@ setup(
     cmdclass={
         "upload": UploadCommand,
     },
-    scripts=["bin/audioldm2.cmd", "bin/audioldm2"],
+    scripts=["bin/audioldm2.cmd", "bin/audioldm2", "bin/audioldm2_tag"],
 )
