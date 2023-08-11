@@ -2,7 +2,7 @@
 import os
 import torch
 import logging
-from audioldm2 import text_to_audio, build_model, save_wave, get_time, read_list
+from audioldm2 import text_to_audio_with_scores, build_model, save_wave, get_time, read_list
 import argparse
 from audiotagger import AudioTagger
 import audioldm2
@@ -125,7 +125,7 @@ for text in prompt_todo:
     else:
         name = text[:128]
 
-    waveform, scores = text_to_audio_with_scores(
+    waveform, scores = text_to_audio(
         audioldm2,
         text,
         seed=random_seed,
