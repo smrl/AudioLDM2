@@ -139,8 +139,8 @@ for text in prompt_todo:
     files = save_wave(waveform, save_path, name=name)
 
     # add metadata tags
-    for i in enumerate(files):
-        tagger = AudioTagger(files[i])
+    for file, score in zip(files, scores):
+        tagger = AudioTagger(file)
         tagger.add_tag("ORIGINATOR", "Team Audio")
         tagger.add_tag("PROCEDURE", "AudioLDM2 Text-to-Audio")
         tagger.add_tag("PROMPT", text)
@@ -148,7 +148,7 @@ for text in prompt_todo:
         tagger.add_tag("STEPS", args.ddim_steps)
         tagger.add_tag("SAMPLER", "DDIM")
         tagger.add_tag("GUIDANCE", guidance_scale)
-        tagger.add_tag("SCORE", scores[i])
+        tagger.add_tag("SCORE", score)
         tagger.write_tags()
 
         results.append([file, text])
