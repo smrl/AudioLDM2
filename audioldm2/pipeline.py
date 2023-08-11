@@ -162,6 +162,39 @@ def build_model(ckpt_path=None, config=None, model_name="audioldm2-full"):
 def duration_to_latent_t_size(duration):
     return int(duration * 25.6)
 
+def text_to_audio_with_scores(
+    latent_diffusion,
+    text,
+    seed=42,
+    ddim_steps=200,
+    duration=10,
+    batchsize=1,
+    guidance_scale=3.5,
+    n_candidate_gen_per_text=3,
+    config=None,
+):
+    assert (
+        duration == 10
+    ), "Error: Currently we only support 10 seconds of generation. Generating longer files requires some extra coding, which would be a part of the future work."
+
+    seed_everything(int(seed))
+    waveform = None
+
+    batch = make_batch_for_text_to_audio(text, waveform=waveform, batchsize=batchsize)
+
+    latent_diffusion.latent_t_size = duration_to_latent_t_size(duration)
+
+    with torch.no_grad():
+        waveform, scores = latent_diffusion.generate_batch_and_scores(
+            batch,
+            unconditional_guidance_scale=guidance_scale,
+            ddim_steps=ddim_steps,
+            n_gen=n_candidate_gen_per_text,
+            duration=duration,
+        )
+
+    return waveform, scores
+
 def text_to_audio(
     latent_diffusion,
     text,
@@ -185,7 +218,7 @@ def text_to_audio(
     latent_diffusion.latent_t_size = duration_to_latent_t_size(duration)
 
     with torch.no_grad():
-        waveform = latent_diffusion.generate_batch(
+        waveform = latent_diffusion.generate_batch_and_scores(
             batch,
             unconditional_guidance_scale=guidance_scale,
             ddim_steps=ddim_steps,
