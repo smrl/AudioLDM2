@@ -5,10 +5,11 @@ import logging
 from audioldm2 import text_to_audio, build_model, save_wave, get_time, read_list
 import argparse
 from audiotagger import AudioTagger
+import audioldm2
 from audioldm2.latent_diffusion.modules.encoders.modules import *
 import soundfile as sf
 import torch
-print(f"AudioLDM2 Library: {build_model.__file__}")
+print(f"AudioLDM2 Library: {audioldm2.__file__}")
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 matplotlib_logger = logging.getLogger('matplotlib')
