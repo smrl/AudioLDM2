@@ -1,1 +1,1 @@
-import AudioTagger
+from audiotagger import AudioTagger
