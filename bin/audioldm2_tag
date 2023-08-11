@@ -125,7 +125,7 @@ for text in prompt_todo:
     else:
         name = text[:128]
 
-    waveform, scores = text_to_audio(
+    waveform, scores = text_to_audio_with_scores(
         audioldm2,
         text,
         seed=random_seed,
