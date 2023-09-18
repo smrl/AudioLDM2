@@ -2,14 +2,13 @@
 import os
 import torch
 import logging
-from audioldm2 import text_to_audio_with_scores, build_model, save_wave, get_time, read_list
+from audioldm2 import text_to_audio, build_model, save_wave, get_time, read_list
 import argparse
 from audiotagger import AudioTagger
 import audioldm2
 from audioldm2.latent_diffusion.modules.encoders.modules import *
 import soundfile as sf
 import torch
-print(f"AudioLDM2 Library: {audioldm2.__file__}")
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 matplotlib_logger = logging.getLogger('matplotlib')
@@ -24,6 +23,14 @@ parser.add_argument(
     required=False,
     default="",
     help="Text prompt to the model for audio generation",
+)
+
+parser.add_argument(
+    "--transcription",
+    type=str,
+    required=False,
+    default="",
+    help="Transcription for Text-to-Speech",
 )
 
 parser.add_argument(
@@ -50,7 +57,16 @@ parser.add_argument(
     required=False,
     help="The checkpoint you gonna use",
     default="audioldm2-full",
-    choices=["audioldm2-full", "audioldm2-music-665k", "audioldm2-full-large-650k"]
+    choices=["audioldm_48k", "audioldm_16k_crossattn_t5", "audioldm2-full", "audioldm2-music-665k", "audioldm2-full-large-1150k","audioldm2-speech-ljspeech","audioldm2-speech-gigaspeech"]
+)
+
+parser.add_argument(
+    "-d",
+    "--device",
+    type=str,
+    required=False,
+    help="The device for computation. If not specified, the script will automatically choose the device based on your environment.",
+    default="auto",
 )
 
 parser.add_argument(
@@ -80,6 +96,15 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "-dur",
+    "--duration",
+    type=float,
+    required=False,
+    default=10.0,
+    help="The duration of the samples",
+)
+
+parser.add_argument(
     "-n",
     "--n_candidate_gen_per_text",
     type=int,
@@ -104,12 +129,34 @@ save_path = os.path.join(args.save_path, get_time())
 
 text = args.text
 random_seed = args.seed
-duration = 10
+duration = args.duration
+sample_rate=16000
+latent_t_per_second=25.6
+
+if("audioldm2" in args.model_name):
+    print("Warning: For AudioLDM2 we currently only support 10s of generation. Please use audioldm_48k or audioldm_16k_crossattn_t5 if you want a different duration.")
+    duration = 10
+
+# A bit dirty solution
+if("48k" in args.model_name):
+    sample_rate = 48000
+    latent_t_per_second=12.8
+
 guidance_scale = args.guidance_scale
 n_candidate_gen_per_text = args.n_candidate_gen_per_text
+transcription = args.transcription
+
+if(transcription):
+    if "speech" not in args.model_name:
+        print("Warning: You choose to perform Text-to-Speech by providing the transcription.However you do not choose the correct model name (audioldm2-speech-gigaspeech or audioldm2-speech-ljspeech).")
+        print("Warning: We will use audioldm2-speech-gigaspeech by default")
+        args.model_name = "audioldm2-speech-gigaspeech"
+    if(not text):
+        print("Warning: You should provide text as a input to describe the speaker. Use default (A male reporter is speaking)")
+        text = "A female reporter is speaking full of emotion"
 
 os.makedirs(save_path, exist_ok=True)
-audioldm2 = build_model(model_name=args.model_name)
+audioldm2 = build_model(model_name=args.model_name, device=args.device)
 
 if(args.text_list):
     print("Generate audio based on the text prompts in %s" % args.text_list)
@@ -117,26 +164,30 @@ if(args.text_list):
 else: 
     prompt_todo = [text]
     
-results = []
-
 for text in prompt_todo:
     if("|" in text):
         text, name = text.split("|")
     else:
         name = text[:128]
 
+    if(transcription):
+        name += "-TTS-%s" % transcription
+
     waveform, scores = text_to_audio_with_scores(
         audioldm2,
         text,
+        transcription=transcription, # To avoid the model to ignore the last vocab
         seed=random_seed,
         duration=duration,
         guidance_scale=guidance_scale,
         ddim_steps=args.ddim_steps,
         n_candidate_gen_per_text=n_candidate_gen_per_text,
         batchsize=args.batchsize,
+        latent_t_per_second=latent_t_per_second
     )
-    print("saving...")
-    files = save_wave(waveform, save_path, name=name)
+        print("saving...")
+
+    files = save_wave(waveform, save_path, name=name, samplerate=sample_rate) # save_wave now returns paths so I can add tags to each
 
     # add metadata tags
     for file, score in zip(files, scores):
@@ -151,28 +202,3 @@ for text in prompt_todo:
         tagger.add_tag("SCORE", score)
         tagger.write_tags()
 
-        results.append([file, text])
-    
-# CLAP scoring
-
-#print ("Scoring audio with CLAP")
-#
-#clap = CLAPAudioEmbeddingClassifierFreev2(
-#            pretrained_path="",
-#            sampling_rate=16000,
-#            embed_mode="audio",
-#            amodel="HTSAT-base",
-#        ).cuda()
-#
-#for text in prompt_todo:
-#    for result in results:
-#        result_path, result_text = result
-#        if result_text == text:  # if the prompt matches
-#            waveform_np = sf.read(result_path)[0]
-#            waveform = torch.tensor(waveform_np).unsqueeze(0).float().cuda() # move to GPU
-#            score = clap.cos_similarity(waveform, result_text) # calculate the score
-#            score_float = score.cpu().item() # retrieve float from GPU
-#            tagger = AudioTagger(result_path) # result[0] is the path to the generated audio
-#            tagger.add_tag("SCORE", score_float) # add the score to the audio
-#            tagger.write_tags() # write the tags to the audio
-#            print("Score for %s is %s" % (result_path, score))
