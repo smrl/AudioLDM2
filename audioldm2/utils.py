@@ -52,6 +52,8 @@ def seed_everything(seed):
 
 
 def save_wave(waveform, savepath, name="outwav", samplerate=16000):
+    paths = []
+
     if type(name) is not list:
         name = [name] * waveform.shape[0]
 

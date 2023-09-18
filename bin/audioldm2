@@ -4,6 +4,11 @@ import torch
 import logging
 from audioldm2 import text_to_audio, build_model, save_wave, get_time, read_list
 import argparse
+from audiotagger import AudioTagger
+import audioldm2
+from audioldm2.latent_diffusion.modules.encoders.modules import *
+import soundfile as sf
+import torch
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 matplotlib_logger = logging.getLogger('matplotlib')
@@ -168,7 +173,7 @@ for text in prompt_todo:
     if(transcription):
         name += "-TTS-%s" % transcription
 
-    waveform = text_to_audio(
+    waveform, scores = text_to_audio_with_scores(
         audioldm2,
         text,
         transcription=transcription, # To avoid the model to ignore the last vocab
@@ -180,5 +185,20 @@ for text in prompt_todo:
         batchsize=args.batchsize,
         latent_t_per_second=latent_t_per_second
     )
-    
-    save_wave(waveform, save_path, name=name, samplerate=sample_rate)
+        print("saving...")
+
+    files = save_wave(waveform, save_path, name=name, samplerate=sample_rate) # save_wave now returns paths so I can add tags to each
+
+    # add metadata tags
+    for file, score in zip(files, scores):
+        tagger = AudioTagger(file)
+        tagger.add_tag("ORIGINATOR", "Team Audio")
+        tagger.add_tag("PROCEDURE", "AudioLDM2 Text-to-Audio")
+        tagger.add_tag("PROMPT", text)
+        tagger.add_tag("SEED", random_seed)
+        tagger.add_tag("STEPS", args.ddim_steps)
+        tagger.add_tag("SAMPLER", "DDIM")
+        tagger.add_tag("GUIDANCE", guidance_scale)
+        tagger.add_tag("SCORE", score)
+        tagger.write_tags()
+

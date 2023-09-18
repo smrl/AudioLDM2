@@ -2,7 +2,7 @@
 import os
 import torch
 import logging
-from audioldm2 import text_to_audio, build_model, save_wave, get_time, read_list
+from audioldm2 import text_to_audio_with_scores, build_model, save_wave, get_time, read_list
 import argparse
 from audiotagger import AudioTagger
 import audioldm2
