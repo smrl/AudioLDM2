@@ -185,7 +185,8 @@ for text in prompt_todo:
         batchsize=args.batchsize,
         latent_t_per_second=latent_t_per_second
     )
-        print("saving...")
+    
+    print("saving...")
 
     files = save_wave(waveform, save_path, name=name, samplerate=sample_rate) # save_wave now returns paths so I can add tags to each
 
@@ -199,6 +200,6 @@ for text in prompt_todo:
         tagger.add_tag("STEPS", args.ddim_steps)
         tagger.add_tag("SAMPLER", "DDIM")
         tagger.add_tag("GUIDANCE", guidance_scale)
-        tagger.add_tag("SCORE", score)
+        tagger.add_tag("CLAP_SCORE", score)
         tagger.write_tags()
 
