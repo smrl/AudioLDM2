@@ -1,17 +1,19 @@
 import os
+import re
 
 import yaml
 import torch
 import torchaudio
 
+import audioldm2.latent_diffusion.modules.phoneme_encoder.text as text
 from audioldm2.latent_diffusion.models.ddpm import LatentDiffusion
+from audioldm2.latent_diffusion.util import get_vits_phoneme_ids_no_padding
 from audioldm2.utils import default_audioldm_config, download_checkpoint
 import os
 
 # CACHE_DIR = os.getenv(
 #     "AUDIOLDM_CACHE_DIR", os.path.join(os.path.expanduser("~"), ".cache/audioldm2")
 # )
-
 
 def seed_everything(seed):
     import random, os
@@ -26,10 +28,11 @@ def seed_everything(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
 
+def text2phoneme(data):
+    return text._clean_text(re.sub(r'<.*?>', '', data), ["english_cleaners2"])
 
 def text_to_filename(text):
     return text.replace(" ", "_").replace("'", "_").replace('"', "_")
-
 
 def extract_kaldi_fbank_feature(waveform, sampling_rate, log_mel_spec):
     norm_mean = -4.2677393
@@ -69,9 +72,12 @@ def extract_kaldi_fbank_feature(waveform, sampling_rate, log_mel_spec):
 
     return {"ta_kaldi_fbank": fbank}  # [1024, 128]
 
-
-def make_batch_for_text_to_audio(text, waveform=None, fbank=None, batchsize=1):
+def make_batch_for_text_to_audio(text, transcription="", waveform=None, fbank=None, batchsize=1):
     text = [text] * batchsize
+    if(transcription):
+        transcription = text2phoneme(transcription)
+    transcription = [transcription] * batchsize
+
     if batchsize < 1:
         print("Warning: Batchsize must be at least 1. Batchsize is set to .")
 
@@ -85,6 +91,7 @@ def make_batch_for_text_to_audio(text, waveform=None, fbank=None, batchsize=1):
         assert fbank.size(0) == batchsize
 
     stft = torch.zeros((batchsize, 1024, 512))  # Not used
+    phonemes = get_vits_phoneme_ids_no_padding(transcription)
 
     if waveform is None:
         waveform = torch.zeros((batchsize, 160000))  # Not used
@@ -103,7 +110,7 @@ def make_batch_for_text_to_audio(text, waveform=None, fbank=None, batchsize=1):
         "log_mel_spec": fbank,
         "ta_kaldi_fbank": ta_kaldi_fbank,
     }
-
+    batch.update(phonemes)
     return batch
 
 
@@ -125,15 +132,20 @@ def round_up_duration(duration):
 #     torch.save({"state_dict": new_state_dict}, os.path.join(CACHE_DIR, "clap.pth"))
 
 
-def build_model(ckpt_path=None, config=None, model_name="audioldm2-full"):
+def build_model(ckpt_path=None, config=None, device=None, model_name="audioldm2-full"):
+
+    if device is None or device == "auto":
+        if torch.cuda.is_available():
+            device = torch.device("cuda:0")
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+
     print("Loading AudioLDM-2: %s" % model_name)
+    print("Loading model on %s" % device)
 
     ckpt_path = download_checkpoint(model_name)
-
-    if torch.cuda.is_available():
-        device = torch.device("cuda:0")
-    else:
-        device = torch.device("cpu")
 
     if config is not None:
         assert type(config) is str
@@ -159,63 +171,26 @@ def build_model(ckpt_path=None, config=None, model_name="audioldm2-full"):
     
     return latent_diffusion
 
-def duration_to_latent_t_size(duration):
-    return int(duration * 25.6)
-
-def text_to_audio_with_scores(
-    latent_diffusion,
-    text,
-    seed=42,
-    ddim_steps=200,
-    duration=10,
-    batchsize=1,
-    guidance_scale=3.5,
-    n_candidate_gen_per_text=3,
-    config=None,
-):
-    assert (
-        duration == 10
-    ), "Error: Currently we only support 10 seconds of generation. Generating longer files requires some extra coding, which would be a part of the future work."
-
-    seed_everything(int(seed))
-    waveform = None
-
-    batch = make_batch_for_text_to_audio(text, waveform=waveform, batchsize=batchsize)
-
-    latent_diffusion.latent_t_size = duration_to_latent_t_size(duration)
-
-    with torch.no_grad():
-        waveform, scores = latent_diffusion.generate_batch_and_scores(
-            batch,
-            unconditional_guidance_scale=guidance_scale,
-            ddim_steps=ddim_steps,
-            n_gen=n_candidate_gen_per_text,
-            duration=duration,
-        )
-
-    return waveform, scores
-
 def text_to_audio(
     latent_diffusion,
     text,
+    transcription="",
     seed=42,
     ddim_steps=200,
     duration=10,
     batchsize=1,
     guidance_scale=3.5,
     n_candidate_gen_per_text=3,
+    latent_t_per_second=25.6,
     config=None,
 ):
-    assert (
-        duration == 10
-    ), "Error: Currently we only support 10 seconds of generation. Generating longer files requires some extra coding, which would be a part of the future work."
 
     seed_everything(int(seed))
     waveform = None
 
-    batch = make_batch_for_text_to_audio(text, waveform=waveform, batchsize=batchsize)
+    batch = make_batch_for_text_to_audio(text, transcription=transcription, waveform=waveform, batchsize=batchsize)
 
-    latent_diffusion.latent_t_size = duration_to_latent_t_size(duration)
+    latent_diffusion.latent_t_size = int(duration * latent_t_per_second)
 
     with torch.no_grad():
         waveform = latent_diffusion.generate_batch_and_scores(
@@ -227,3 +202,35 @@ def text_to_audio(
         )
 
     return waveform
+
+def text_to_audio_with_scores(
+    latent_diffusion,
+    text,
+    transcription="",
+    seed=42,
+    ddim_steps=200,
+    duration=10,
+    batchsize=1,
+    guidance_scale=3.5,
+    n_candidate_gen_per_text=3,
+    latent_t_per_second=25.6,
+    config=None,
+):
+
+    seed_everything(int(seed))
+    waveform = None
+
+    batch = make_batch_for_text_to_audio(text, transcription=transcription, waveform=waveform, batchsize=batchsize)
+
+    latent_diffusion.latent_t_size = int(duration * latent_t_per_second)
+
+    with torch.no_grad():
+        waveform, scores = latent_diffusion.generate_batch_and_scores(
+            batch,
+            unconditional_guidance_scale=guidance_scale,
+            ddim_steps=ddim_steps,
+            n_gen=n_candidate_gen_per_text,
+            duration=duration,
+        )
+
+    return waveform, scores

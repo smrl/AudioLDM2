@@ -113,6 +113,7 @@ class DDPM(nn.Module):
 
         self.clap = CLAPAudioEmbeddingClassifierFreev2(
             pretrained_path="",
+            enable_cuda=self.device=="cuda",
             sampling_rate=self.sampling_rate,
             embed_mode="audio",
             amodel="HTSAT-base",
@@ -481,12 +482,13 @@ class DDPM(nn.Module):
     def get_input(self, batch, k):
         # fbank, log_magnitudes_stft, label_indices, fname, waveform, clip_label, text = batch
         # fbank, stft, label_indices, fname, waveform, text = batch
-        fname, text, waveform, stft, fbank = (
+        fname, text, waveform, stft, fbank, phoneme_idx = (
             batch["fname"],
             batch["text"],
             batch["waveform"],
             batch["stft"],
             batch["log_mel_spec"],
+            batch["phoneme_idx"]
         )
         # for i in range(fbank.size(0)):
         #     fb = fbank[i].numpy()
@@ -509,6 +511,7 @@ class DDPM(nn.Module):
         # ret["clip_label"] = clip_label.to(memory
         # _format=torch.contiguous_format).float()
         ret["waveform"] = waveform.to(memory_format=torch.contiguous_format).float()
+        ret["phoneme_idx"] = phoneme_idx.to(memory_format=torch.contiguous_format).long()
         ret["text"] = list(text)
         ret["fname"] = fname
 
@@ -776,7 +779,10 @@ class LatentDiffusion(DDPM):
     def instantiate_cond_stage(self, config):
         self.cond_stage_model_metadata = {}
         for i, cond_model_key in enumerate(config.keys()):
+            if "params" in config[cond_model_key] and "device" in config[cond_model_key]["params"]:
+                config[cond_model_key]["params"]["device"] = self.device
             model = instantiate_from_config(config[cond_model_key])
+            model = model.to(self.device)
             self.cond_stage_models.append(model)
             self.cond_stage_model_metadata[cond_model_key] = {
                 "model_idx": i,
@@ -855,16 +861,16 @@ class LatentDiffusion(DDPM):
                 if cond_model_key in cond_dict.keys():
                     continue
 
-                if not self.training:
-                    if isinstance(
-                        self.cond_stage_models[
-                            self.cond_stage_model_metadata[cond_model_key]["model_idx"]
-                        ],
-                        CLAPAudioEmbeddingClassifierFreev2,
-                    ):
-                        print(
-                            "Warning: CLAP model normally should use text for evaluation"
-                        )
+                # if not self.training:
+                #     if isinstance(
+                #         self.cond_stage_models[
+                #             self.cond_stage_model_metadata[cond_model_key]["model_idx"]
+                #         ],
+                #         CLAPAudioEmbeddingClassifierFreev2,
+                #     ):
+                #         print(
+                #             "Warning: CLAP model normally should use text for evaluation"
+                #         )
 
                 # The original data for conditioning
                 # If cond_model_key is "all", that means the conditional model need all the information from a batch
@@ -1428,7 +1434,7 @@ class LatentDiffusion(DDPM):
 
         intermediate = None
         if ddim and not use_plms:
-            ddim_sampler = DDIMSampler(self)
+            ddim_sampler = DDIMSampler(self, device=self.device)
             samples, intermediates = ddim_sampler.sample(
                 ddim_steps,
                 batch_size,

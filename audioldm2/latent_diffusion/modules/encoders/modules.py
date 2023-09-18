@@ -95,6 +95,8 @@ class PhonemeEncoder(nn.Module):
         if self.device is None:
             self.device = self.learnable_positional_embedding.device
             self.pad_token_sequence = self.pad_token_sequence.to(self.device)
+        
+        phoneme_idx = phoneme_idx.to(self.device)
 
         src_length = self._get_src_length(phoneme_idx)
         text_emb, m, logs, text_emb_mask = self.text_encoder(phoneme_idx, src_length)
@@ -518,11 +520,11 @@ class AudioMAEConditionCTPoolRand(nn.Module):
     # Required
     def forward(self, batch, time_pool=None, freq_pool=None):
         assert batch.size(-2) == 1024 and batch.size(-1) == 128
-
+        
         if self.device is None:
-            self.device = batch.device
+            self.device = next(self.audiomae.parameters()).device
 
-        batch = batch.unsqueeze(1)
+        batch = batch.unsqueeze(1).to(self.device)
         with torch.no_grad():
             representation = self.audiomae(
                 batch,
@@ -545,6 +547,7 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
     def __init__(
         self,
         pretrained_path="",
+        enable_cuda=False,
         sampling_rate=16000,
         embed_mode="audio",
         amodel="HTSAT-base",
@@ -554,7 +557,8 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
         training_mode=True,
     ):
         super().__init__()
-        self.device = "cpu"
+        self.device = "cpu" # The model itself is on cpu
+        self.cuda = enable_cuda
         self.precision = "fp32"
         self.amodel = amodel  # or 'PANN-14'
         self.tmodel = "roberta"  # the best text encoder in our training
@@ -578,6 +582,7 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
             enable_fusion=self.enable_fusion,
             fusion_type=self.fusion_type,
         )
+        self.model = self.model.to(self.device)
         audio_cfg = self.model_cfg["audio_cfg"]
         self.mel_transform = torchaudio.transforms.MelSpectrogram(
             sample_rate=audio_cfg["sample_rate"],
@@ -636,7 +641,11 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
         original_embed_mode = self.embed_mode
         with torch.no_grad():
             self.embed_mode = "audio"
-            audio_emb = self(waveform.cuda())
+            # MPS currently does not support ComplexFloat dtype and operator 'aten::_fft_r2c'
+            if self.cuda:
+                audio_emb = self(waveform.cuda())
+            else:
+                audio_emb = self(waveform.to("cpu"))
             self.embed_mode = "text"
             text_emb = self(text)
             similarity = F.cosine_similarity(audio_emb, text_emb, dim=2)
@@ -660,7 +669,7 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
                 self.tmodel,
                 self.pretrained,
                 precision=self.precision,
-                device="cuda",
+                device="cuda" if self.cuda else "cpu",
                 enable_fusion=self.enable_fusion,
                 fusion_type=self.fusion_type,
             )
@@ -692,8 +701,8 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
                     batch = torchaudio.functional.resample(
                         batch, orig_freq=self.sampling_rate, new_freq=48000
                     )
-
-                audio_data = batch.squeeze(1)
+                audio_data = batch.squeeze(1).to("cpu")
+                self.mel_transform = self.mel_transform.to(audio_data.device)
                 mel = self.mel_transform(audio_data)
                 audio_dict = get_audio_features(
                     audio_data,
