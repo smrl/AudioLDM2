@@ -1568,9 +1568,9 @@ class LatentDiffusion(DDPM):
             waveform = waveform[best_index]
             scores = candidates[best_index]
 
-            print("Similarity between generated audio and text:")
-            print(' '.join('{:.2f}'.format(num) for num in similarity.detach().cpu().tolist()))
-            print("Choose the following indexes as the output:", best_index)
+#            print("Similarity between generated audio and text:")
+#            print(' '.join('{:.2f}'.format(num) for num in similarity.detach().cpu().tolist()))
+#            print("Choose the following indexes as the output:", best_index)
 
             return waveform, scores
 
