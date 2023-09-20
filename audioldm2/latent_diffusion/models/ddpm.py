@@ -1551,21 +1551,29 @@ class LatentDiffusion(DDPM):
             waveform = self.mel_spectrogram_to_waveform(
                 mel, savepath="", bs=None, name=fnames, save=False
             )
+            
+            best_index = []
+            best_score = []
+            candidates = []
 
-            # Compute similarity between generated audio and text
             similarity = self.clap.cos_similarity(
                 torch.FloatTensor(waveform).squeeze(1), text
             )
-            scores = similarity.detach().cpu().tolist()
-            #for i in range(z.shape[0]):
-            #    candidates = similarity[i :: z.shape[0]]
-            #    max_index = torch.argmax(candidates).item()
-            #    best_index.append(i + max_index * z.shape[0])
+
+            for i in range(z.shape[0]):
+                candidates = similarity[i :: z.shape[0]]
+                max_index = torch.argmax(candidates).item()
+                best_index.append(i + max_index * z.shape[0])
+
+            waveform = waveform[best_index]
+            scores = candidates[best_index]
+
             print("Similarity between generated audio and text:")
             print(' '.join('{:.2f}'.format(num) for num in similarity.detach().cpu().tolist()))
-            print("returning all scores for metadata inclusion")
+            print("Choose the following indexes as the output:", best_index)
 
             return waveform, scores
+
 
     @torch.no_grad()
     def generate_batch(
