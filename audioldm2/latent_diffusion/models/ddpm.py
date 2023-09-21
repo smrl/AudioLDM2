@@ -1474,7 +1474,7 @@ class LatentDiffusion(DDPM):
         return samples, intermediate
 
     @torch.no_grad()
-    def generate_batch_and_scores(
+    def generate_batch_and_score(
         self,
         batch,
         ddim_steps=200,
@@ -1486,7 +1486,7 @@ class LatentDiffusion(DDPM):
         use_plms=False,
         **kwargs,
     ):
-        scores = []
+        
         # Generate n_gen times and select the best
         # Batch: audio, text, fnames
         assert x_T is None
@@ -1553,8 +1553,6 @@ class LatentDiffusion(DDPM):
             )
             
             best_index = []
-            best_score = []
-            candidates = []
 
             similarity = self.clap.cos_similarity(
                 torch.FloatTensor(waveform).squeeze(1), text
@@ -1565,14 +1563,14 @@ class LatentDiffusion(DDPM):
                 max_index = torch.argmax(candidates).item()
                 best_index.append(i + max_index * z.shape[0])
 
+            candidates_offloaded = similarity.detach().cpu().tolist() # get candidates from GPU
             waveform = waveform[best_index]
-            scores = candidates[best_index]
-
+            score = [candidates[i] for i in best_index]
 #            print("Similarity between generated audio and text:")
 #            print(' '.join('{:.2f}'.format(num) for num in similarity.detach().cpu().tolist()))
 #            print("Choose the following indexes as the output:", best_index)
 
-            return waveform, scores
+            return waveform, score
 
 
     @torch.no_grad()

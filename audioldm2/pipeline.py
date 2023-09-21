@@ -203,7 +203,7 @@ def text_to_audio(
 
     return waveform
 
-def text_to_audio_with_scores(
+def text_to_audio_with_score(
     latent_diffusion,
     text,
     transcription="",
@@ -225,7 +225,7 @@ def text_to_audio_with_scores(
     latent_diffusion.latent_t_size = int(duration * latent_t_per_second)
 
     with torch.no_grad():
-        waveform, scores = latent_diffusion.generate_batch_and_scores(
+        waveform, score = latent_diffusion.generate_batch_and_score(
             batch,
             unconditional_guidance_scale=guidance_scale,
             ddim_steps=ddim_steps,
@@ -233,4 +233,4 @@ def text_to_audio_with_scores(
             duration=duration,
         )
 
-    return waveform, scores
+    return waveform, score

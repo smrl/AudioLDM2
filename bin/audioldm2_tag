@@ -173,7 +173,7 @@ for text in prompt_todo:
     if(transcription):
         name += "-TTS-%s" % transcription
 
-    waveform, scores = text_to_audio_with_scores(
+    waveform, scores = text_to_audio_with_score(
         audioldm2,
         text,
         transcription=transcription, # To avoid the model to ignore the last vocab
