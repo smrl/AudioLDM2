@@ -198,7 +198,7 @@ for text in prompt_todo:
         tagger.add_tag("PROMPT", text)
         tagger.add_tag("SEED", random_seed)
         tagger.add_tag("STEPS", args.ddim_steps)
-        tagger.add_tag("SAMPLER", "DDIM")
+        tagger.add_tag("SAMPLER", "DDPM")
         tagger.add_tag("GUIDANCE", guidance_scale)
         tagger.add_tag("CLAP_SCORE", score)
         tagger.write_tags()
