@@ -1565,7 +1565,7 @@ class LatentDiffusion(DDPM):
 
             candidates_offloaded = similarity.detach().cpu().tolist() # get candidates from GPU
             waveform = waveform[best_index]
-            score = [candidates[i] for i in best_index]
+            score = [candidates_offloaded[i] for i in best_index]
 #            print("Similarity between generated audio and text:")
 #            print(' '.join('{:.2f}'.format(num) for num in similarity.detach().cpu().tolist()))
 #            print("Choose the following indexes as the output:", best_index)
